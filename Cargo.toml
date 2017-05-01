@@ -1,6 +1,6 @@
 [package]
 name = "futures-fs"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Sean McArthur <sean.monstar@gmail.com>"]
 description = "A Futures implementation for File System operations"
 license = "MIT/Apache-2.0"
