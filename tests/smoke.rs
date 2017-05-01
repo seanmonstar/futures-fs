@@ -14,10 +14,10 @@ fn test_smoke() {
     tmp.push("futures-fs");
 
     let bytes = futures::stream::iter(vec!["hello", " ", "world"].into_iter().map(|piece| {
-        Ok::<_, ::std::io::Error>(piece)
+        Ok::<_, ::std::io::Error>(piece.into())
     }));
 
-    bytes.forward(fs.write(tmp.clone())).wait().unwrap();
+    bytes.forward(fs.write(tmp.clone(), Default::default())).wait().unwrap();
 
     let data = fs.read(tmp.clone()).collect().wait().unwrap().concat();
     assert_eq!(data, b"hello world");

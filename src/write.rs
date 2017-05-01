@@ -2,6 +2,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::path::Path;
 
+use bytes::Bytes;
 use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
 use futures_cpupool::CpuFuture;
 
@@ -17,11 +18,17 @@ pub fn new<P: AsRef<Path> + Send + 'static>(pool: &FsPool, path: P, opts: WriteO
     }
 }
 
+/// A `Sink` to send bytes to be written to a target file.
 pub struct FsWriteSink {
     pool: FsPool,
     state: State,
 }
 
+/// Options for how to write to the target file.
+///
+/// The default is to create a new file at the path.
+///
+/// This can be created from `std::fs::OpenOptions`.
 #[derive(Debug)]
 pub struct WriteOptions {
     open: OpenOptions,
@@ -29,10 +36,11 @@ pub struct WriteOptions {
 
 impl Default for WriteOptions {
     fn default() -> WriteOptions {
+        let mut opts = OpenOptions::new();
+        opts.write(true)
+            .create(true);
         WriteOptions {
-            open: OpenOptions::new()
-                .write(true)
-                .create(true),
+            open: opts,
         }
     }
 }
@@ -69,7 +77,7 @@ impl FsWriteSink {
 }
 
 impl Sink for FsWriteSink {
-    type SinkItem = &'static str;
+    type SinkItem = Bytes;
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
