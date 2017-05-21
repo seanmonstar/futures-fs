@@ -1,6 +1,6 @@
 use std::cmp;
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::mem;
 use std::path::{PathBuf, Path};
 
