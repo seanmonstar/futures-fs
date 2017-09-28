@@ -1,6 +1,6 @@
 [package]
 name = "futures-fs"
-version = "0.0.2" # don't forget to update html_root_url
+version = "0.0.3" # don't forget to update html_root_url
 authors = ["Sean McArthur <sean@seanmonstar.com>"]
 description = "A Futures implementation for File System operations"
 repository = "https://github.com/seanmonstar/futures-fs"
