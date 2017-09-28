@@ -2,6 +2,7 @@ use std::{cmp, fmt, mem};
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{PathBuf, Path};
+use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::{Async, Future, Poll, Stream};
@@ -14,20 +15,23 @@ const BUF_SIZE: usize = 8192;
 pub fn new<P: AsRef<Path> + Send + 'static>(pool: &FsPool, path: P) -> FsReadStream {
     FsReadStream {
         buffer: BytesMut::with_capacity(0),
+        //TODO: can we adjust bounds, since this is making an owned copy anyways?
+        path: Arc::new(path.as_ref().to_owned()),
         pool: pool.clone(),
-        state: State::Init(path.as_ref().to_owned()), //State::Working(open),
+        state: State::Init,
     }
 }
 
 /// A `Stream` of bytes from a target file.
 pub struct FsReadStream {
     buffer: BytesMut,
+    path: Arc<PathBuf>,
     pool: FsPool,
     state: State,
 }
 
 enum State {
-    Init(PathBuf),
+    Init,
     Working(CpuFuture<(File, BytesMut), io::Error>),
     Ready(File),
     Eof,
@@ -41,9 +45,10 @@ impl Stream for FsReadStream {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             match mem::replace(&mut self.state, State::Swapping) {
-                State::Init(path) => {
+                State::Init => {
+                    let path = self.path.clone();
                     self.state = State::Working(self.pool.cpu_pool.spawn_fn(move || {
-                        open_and_read(path)
+                        open_and_read(&path)
                     }));
                 },
                 State::Working(mut cpu) => {
@@ -78,6 +83,7 @@ impl Stream for FsReadStream {
 impl fmt::Debug for FsReadStream {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("FsReadStream")
+            .field("path", &self.path)
             .finish()
     }
 }
@@ -91,8 +97,8 @@ fn read(mut file: File, mut buf: BytesMut) -> io::Result<(File, BytesMut)> {
     Ok((file, buf))
 }
 
-fn open_and_read(path: PathBuf) -> io::Result<(File, BytesMut)> {
-    let len = try!(fs::metadata(&path)).len();
+fn open_and_read(path: &Path) -> io::Result<(File, BytesMut)> {
+    let len = try!(fs::metadata(path)).len();
     let file = try!(File::open(path));
 
     // if size is smaller than our chunk size, dont reserve wasted space
