@@ -1,4 +1,30 @@
-//! A CPU Pool to handle file IO operations.
+//! A thread pool to handle file IO operations.
+//!
+//! # Examples
+//!
+//! ```rust
+//! extern crate futures;
+//! extern crate futures_fs;
+//!
+//! use futures::{Future, Stream};
+//! use futures_fs::FsPool;
+//!
+//! # fn run() {
+//! let fs = FsPool::default();
+//!
+//! // our source file
+//! let read = fs.read("/home/sean/foo.txt");
+//!
+//! // default writes options to create a new file
+//! let write = fs.write("/home/sean/out.txt", Default::default());
+//!
+//! // block this thread!
+//! // the reading and writing however will happen off-thread
+//! read.forward(write).wait()
+//!     .expect("IO error piping foo.txt to out.txt");
+//! # }
+//! # fn main() {}
+//! ```
 #![deny(missing_docs)]
 #![deny(warnings)]
 
