@@ -1,3 +1,8 @@
+#![deny(missing_docs)]
+#![deny(warnings)]
+#![deny(missing_debug_implementations)]
+#![doc(html_root_url = "https://docs.rs/futures-fs/0.0.2")]
+
 //! A thread pool to handle file IO operations.
 //!
 //! # Examples
@@ -25,16 +30,13 @@
 //! # }
 //! # fn main() {}
 //! ```
-#![deny(missing_docs)]
-#![deny(warnings)]
 
 extern crate bytes;
 #[macro_use]
 extern crate futures;
 extern crate futures_cpupool;
 
-use std::io;
-use std::fs;
+use std::{fmt, fs, io};
 use std::path::Path;
 
 use futures::{Future, Poll};
@@ -85,6 +87,13 @@ impl Default for FsPool {
     }
 }
 
+impl fmt::Debug for FsPool {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("FsPool")
+            .finish()
+    }
+}
+
 /// A future representing work in the `FsPool`.
 pub struct FsFuture<T> {
     inner: CpuFuture<T, io::Error>,
@@ -102,5 +111,12 @@ impl<T: Send + 'static> Future for FsFuture<T> {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.inner.poll()
+    }
+}
+
+impl<T> fmt::Debug for FsFuture<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("FsFuture")
+            .finish()
     }
 }

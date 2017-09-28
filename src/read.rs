@@ -1,7 +1,6 @@
-use std::cmp;
+use std::{cmp, fmt, mem};
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::mem;
 use std::path::{PathBuf, Path};
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -76,6 +75,12 @@ impl Stream for FsReadStream {
     }
 }
 
+impl fmt::Debug for FsReadStream {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("FsReadStream")
+            .finish()
+    }
+}
 
 fn read(mut file: File, mut buf: BytesMut) -> io::Result<(File, BytesMut)> {
     if !buf.has_remaining_mut() {

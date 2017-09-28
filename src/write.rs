@@ -1,3 +1,4 @@
+use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::path::Path;
@@ -99,5 +100,12 @@ impl Sink for FsWriteSink {
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         self.poll_working()
+    }
+}
+
+impl fmt::Debug for FsWriteSink {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("FsWriteSink")
+            .finish()
     }
 }
