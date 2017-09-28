@@ -6,6 +6,7 @@ description = "A Futures implementation for File System operations"
 repository = "https://github.com/seanmonstar/futures-fs"
 documentation = "https://docs.rs/futures-fs"
 license = "MIT/Apache-2.0"
+readme = "README.md"
 keywords = ["futures", "fs", "file", "async"]
 categories = ["asynchronous", "filesystem"]
 
