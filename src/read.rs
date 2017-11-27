@@ -1,14 +1,14 @@
 use std::{cmp, fmt, mem};
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::{Async, Future, Poll, Stream};
 use futures_cpupool::CpuFuture;
 
-use ::FsPool;
+use FsPool;
 
 const BUF_SIZE: usize = 8192;
 
@@ -47,14 +47,13 @@ impl Stream for FsReadStream {
             match mem::replace(&mut self.state, State::Swapping) {
                 State::Init => {
                     let path = self.path.clone();
-                    self.state = State::Working(self.pool.cpu_pool.spawn_fn(move || {
-                        open_and_read(&path)
-                    }));
-                },
+                    self.state =
+                        State::Working(self.pool.cpu_pool.spawn_fn(move || open_and_read(&path)));
+                }
                 State::Working(mut cpu) => {
                     let polled = cpu.poll();
                     self.state = State::Working(cpu);
-                    let (file, chunk) =  try_ready!(polled);
+                    let (file, chunk) = try_ready!(polled);
                     if chunk.is_empty() {
                         self.state = State::Eof;
                         return Ok(Async::Ready(None));
@@ -63,17 +62,16 @@ impl Stream for FsReadStream {
                         self.state = State::Ready(file);
                         return Ok(Async::Ready(Some(self.buffer.take().freeze())));
                     }
-                },
+                }
                 State::Ready(file) => {
                     let buf = self.buffer.split_off(0);
-                    self.state = State::Working(self.pool.cpu_pool.spawn_fn(move || {
-                        read(file, buf)
-                    }));
-                },
+                    self.state =
+                        State::Working(self.pool.cpu_pool.spawn_fn(move || read(file, buf)));
+                }
                 State::Eof => {
                     self.state = State::Eof;
                     return Ok(Async::Ready(None));
-                },
+                }
                 State::Swapping => unreachable!(),
             }
         }

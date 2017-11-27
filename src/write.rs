@@ -7,12 +7,14 @@ use bytes::Bytes;
 use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
 use futures_cpupool::CpuFuture;
 
-use ::FsPool;
+use FsPool;
 
-pub fn new<P: AsRef<Path> + Send + 'static>(pool: &FsPool, path: P, opts: WriteOptions) -> FsWriteSink {
-    let open = pool.cpu_pool.spawn_fn(move || {
-        opts.open.open(path)
-    });
+pub fn new<P: AsRef<Path> + Send + 'static>(
+    pool: &FsPool,
+    path: P,
+    opts: WriteOptions,
+) -> FsWriteSink {
+    let open = pool.cpu_pool.spawn_fn(move || opts.open.open(path));
     FsWriteSink {
         pool: pool.clone(),
         state: State::Working(open),
@@ -38,19 +40,14 @@ pub struct WriteOptions {
 impl Default for WriteOptions {
     fn default() -> WriteOptions {
         let mut opts = OpenOptions::new();
-        opts.write(true)
-            .create(true);
-        WriteOptions {
-            open: opts,
-        }
+        opts.write(true).create(true);
+        WriteOptions { open: opts }
     }
 }
 
 impl From<OpenOptions> for WriteOptions {
     fn from(open: OpenOptions) -> WriteOptions {
-        WriteOptions {
-            open: open,
-        }
+        WriteOptions { open: open }
     }
 }
 
@@ -69,7 +66,7 @@ impl FsWriteSink {
             }
             State::Ready(_) => {
                 return Ok(Async::Ready(()));
-            },
+            }
             State::Swapping => unreachable!(),
         };
         self.state = state;
@@ -105,7 +102,6 @@ impl Sink for FsWriteSink {
 
 impl fmt::Debug for FsWriteSink {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FsWriteSink")
-            .finish()
+        f.debug_struct("FsWriteSink").finish()
     }
 }
