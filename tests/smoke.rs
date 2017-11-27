@@ -1,7 +1,7 @@
 extern crate futures;
 extern crate futures_fs;
 
-use std::env;
+use std::{env, io};
 use futures::{Future, Sink, Stream};
 use futures_fs::FsPool;
 
@@ -13,10 +13,10 @@ fn test_smoke() {
     let mut tmp = env::temp_dir();
     tmp.push("futures-fs");
 
-    let bytes = futures::stream::iter(
+    let bytes = futures::stream::iter_ok::<_, io::Error>(
         vec!["hello", " ", "world"]
             .into_iter()
-            .map(|piece| Ok::<_, ::std::io::Error>(piece.into())),
+            .map(|piece| piece.into()),
     );
 
     bytes
