@@ -90,14 +90,14 @@ fn read(mut file: File, mut buf: BytesMut) -> io::Result<(File, BytesMut)> {
     if !buf.has_remaining_mut() {
         buf.reserve(BUF_SIZE);
     }
-    let n = try!(file.read(unsafe { buf.bytes_mut() }));
+    let n = file.read(unsafe { buf.bytes_mut() })?;
     unsafe { buf.advance_mut(n) };
     Ok((file, buf))
 }
 
 fn open_and_read(path: &Path) -> io::Result<(File, BytesMut)> {
-    let len = try!(fs::metadata(path)).len();
-    let file = try!(File::open(path));
+    let len = fs::metadata(path)?.len();
+    let file = File::open(path)?;
 
     // if size is smaller than our chunk size, dont reserve wasted space
     let initial_cap = cmp::min(len as usize, BUF_SIZE);

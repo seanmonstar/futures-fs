@@ -79,14 +79,14 @@ impl Sink for FsWriteSink {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let state = try!(self.poll_working());
+        let state = self.poll_working()?;
         if state.is_ready() {
             let mut file = match ::std::mem::replace(&mut self.state, State::Swapping) {
                 State::Ready(file) => file,
                 _ => unreachable!(),
             };
             self.state = State::Working(self.pool.cpu_pool.spawn_fn(move || {
-                try!(file.write_all(item.as_ref()));
+                file.write_all(item.as_ref())?;
                 Ok(file)
             }));
             Ok(AsyncSink::Ready)
