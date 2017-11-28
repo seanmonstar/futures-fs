@@ -13,7 +13,7 @@ Access File System operations off-thread, using `Future`s and `Stream`s.
 let fs = FsPool::default();
 
 // our source file
-let read = fs.read("/home/sean/foo.txt");
+let read = fs.read("/home/sean/foo.txt", Default::default());
 
 // default writes options to create a new file
 let write = fs.write("/home/sean/out.txt", Default::default());
