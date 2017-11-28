@@ -24,7 +24,11 @@ fn test_smoke() {
         .wait()
         .unwrap();
 
-    let data = fs.read(tmp.clone()).collect().wait().unwrap().concat();
+    let data = fs.read(tmp.clone(), Default::default())
+        .collect()
+        .wait()
+        .unwrap()
+        .concat();
     assert_eq!(data, b"hello world");
     fs.delete(tmp).wait().unwrap();
 }
@@ -43,7 +47,7 @@ fn test_smoke_long() {
     }
 
     let mut data = Vec::new();
-    for chunk in fs.read(tmp.clone()).wait() {
+    for chunk in fs.read(tmp.clone(), Default::default()).wait() {
         data.extend_from_slice(chunk.unwrap().as_ref());
     }
 

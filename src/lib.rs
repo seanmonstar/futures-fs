@@ -18,7 +18,7 @@
 //! let fs = FsPool::default();
 //!
 //! // our source file
-//! let read = fs.read("/home/sean/foo.txt");
+//! let read = fs.read("/home/sean/foo.txt", Default::default());
 //!
 //! // default writes options to create a new file
 //! let write = fs.write("/home/sean/out.txt", Default::default());
@@ -42,9 +42,8 @@ use std::path::Path;
 use futures::{Future, Poll};
 use futures_cpupool::{CpuFuture, CpuPool};
 
-pub use self::read::FsReadStream;
-pub use self::write::FsWriteSink;
-pub use self::write::WriteOptions;
+pub use self::read::{FsReadStream, ReadOptions};
+pub use self::write::{FsWriteSink, WriteOptions};
 
 mod read;
 mod write;
@@ -64,8 +63,12 @@ impl FsPool {
     }
 
     /// Returns a `Stream` of the contents of the file at the supplied path.
-    pub fn read<P: AsRef<Path> + Send + 'static>(&self, path: P) -> FsReadStream {
-        ::read::new(self, path)
+    pub fn read<P: AsRef<Path> + Send + 'static>(
+        &self,
+        path: P,
+        opts: ReadOptions,
+    ) -> FsReadStream {
+        ::read::new(self, path, opts)
     }
 
     /// Returns a `Sink` to send bytes to be written to the file at the supplied path.
