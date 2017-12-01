@@ -18,7 +18,7 @@
 //! let fs = FsPool::default();
 //!
 //! // our source file
-//! let read = fs.read("/home/sean/foo.txt");
+//! let read = fs.read("/home/sean/foo.txt", Default::default());
 //!
 //! // default writes options to create a new file
 //! let write = fs.write("/home/sean/out.txt", Default::default());
@@ -40,11 +40,10 @@ use std::{fmt, fs, io};
 use std::path::Path;
 
 use futures::{Future, Poll};
-use futures_cpupool::{CpuPool, CpuFuture};
+use futures_cpupool::{CpuFuture, CpuPool};
 
-pub use self::read::FsReadStream;
-pub use self::write::FsWriteSink;
-pub use self::write::WriteOptions;
+pub use self::read::{FsReadStream, ReadOptions};
+pub use self::write::{FsWriteSink, WriteOptions};
 
 mod read;
 mod write;
@@ -64,20 +63,26 @@ impl FsPool {
     }
 
     /// Returns a `Stream` of the contents of the file at the supplied path.
-    pub fn read<P: AsRef<Path> + Send + 'static>(&self, path: P) -> FsReadStream {
-        ::read::new(self, path)
+    pub fn read<P: AsRef<Path> + Send + 'static>(
+        &self,
+        path: P,
+        opts: ReadOptions,
+    ) -> FsReadStream {
+        ::read::new(self, path, opts)
     }
 
     /// Returns a `Sink` to send bytes to be written to the file at the supplied path.
-    pub fn write<P: AsRef<Path> + Send + 'static>(&self, path: P, opts: WriteOptions) -> FsWriteSink {
+    pub fn write<P: AsRef<Path> + Send + 'static>(
+        &self,
+        path: P,
+        opts: WriteOptions,
+    ) -> FsWriteSink {
         ::write::new(self, path, opts)
     }
 
     /// Returns a `Future` that resolves when the target file is deleted.
     pub fn delete<P: AsRef<Path> + Send + 'static>(&self, path: P) -> FsFuture<()> {
-        fs(self.cpu_pool.spawn_fn(move || {
-            fs::remove_file(path)
-        }))
+        fs(self.cpu_pool.spawn_fn(move || fs::remove_file(path)))
     }
 }
 
@@ -89,8 +94,7 @@ impl Default for FsPool {
 
 impl fmt::Debug for FsPool {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FsPool")
-            .finish()
+        f.debug_struct("FsPool").finish()
     }
 }
 
@@ -100,9 +104,7 @@ pub struct FsFuture<T> {
 }
 
 fn fs<T: Send>(cpu: CpuFuture<T, io::Error>) -> FsFuture<T> {
-    FsFuture {
-        inner: cpu,
-    }
+    FsFuture { inner: cpu }
 }
 
 impl<T: Send + 'static> Future for FsFuture<T> {
@@ -116,7 +118,6 @@ impl<T: Send + 'static> Future for FsFuture<T> {
 
 impl<T> fmt::Debug for FsFuture<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FsFuture")
-            .finish()
+        f.debug_struct("FsFuture").finish()
     }
 }

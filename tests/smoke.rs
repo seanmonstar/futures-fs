@@ -1,7 +1,7 @@
 extern crate futures;
 extern crate futures_fs;
 
-use std::env;
+use std::{env, io};
 use futures::{Future, Sink, Stream};
 use futures_fs::FsPool;
 
@@ -13,13 +13,22 @@ fn test_smoke() {
     let mut tmp = env::temp_dir();
     tmp.push("futures-fs");
 
-    let bytes = futures::stream::iter(vec!["hello", " ", "world"].into_iter().map(|piece| {
-        Ok::<_, ::std::io::Error>(piece.into())
-    }));
+    let bytes = futures::stream::iter_ok::<_, io::Error>(
+        vec!["hello", " ", "world"]
+            .into_iter()
+            .map(|piece| piece.into()),
+    );
 
-    bytes.forward(fs.write(tmp.clone(), Default::default())).wait().unwrap();
+    bytes
+        .forward(fs.write(tmp.clone(), Default::default()))
+        .wait()
+        .unwrap();
 
-    let data = fs.read(tmp.clone()).collect().wait().unwrap().concat();
+    let data = fs.read(tmp.clone(), Default::default())
+        .collect()
+        .wait()
+        .unwrap()
+        .concat();
     assert_eq!(data, b"hello world");
     fs.delete(tmp).wait().unwrap();
 }
@@ -38,7 +47,7 @@ fn test_smoke_long() {
     }
 
     let mut data = Vec::new();
-    for chunk in fs.read(tmp.clone()).wait() {
+    for chunk in fs.read(tmp.clone(), Default::default()).wait() {
         data.extend_from_slice(chunk.unwrap().as_ref());
     }
 
