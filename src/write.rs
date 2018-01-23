@@ -21,6 +21,16 @@ pub fn new<P: AsRef<Path> + Send + 'static>(
     }
 }
 
+pub fn new_from_file(
+    pool: &FsPool,
+    file: File,
+) -> FsWriteSink {
+    FsWriteSink {
+        pool: pool.clone(),
+        state: State::Ready(file),
+    }
+}
+
 /// A `Sink` to send bytes to be written to a target file.
 pub struct FsWriteSink {
     pool: FsPool,

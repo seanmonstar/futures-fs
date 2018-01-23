@@ -1,5 +1,5 @@
 use std::{cmp, fmt, mem};
-use std::fs::{self, File, Metadata};
+use std::fs::{File, Metadata};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -40,6 +40,21 @@ pub fn new<P: AsRef<Path> + Send + 'static>(
         path: Arc::new(path.as_ref().to_owned()),
         pool: pool.clone(),
         state: State::Init(opts.buffer_size),
+    }
+}
+
+pub fn new_from_file(
+    pool: &FsPool,
+    file: File,
+    opts: ReadOptions,
+) -> FsReadStream {
+    let final_buf_size = finalize_buf_size(opts.buffer_size, &file);
+    FsReadStream {
+        buffer: BytesMut::with_capacity(0),
+        //TODO: can we adjust bounds, since this is making an owned copy anyways?
+        path: Arc::new(PathBuf::new()),
+        pool: pool.clone(),
+        state: State::Ready(file, final_buf_size),
     }
 }
 
@@ -144,8 +159,8 @@ fn read(mut file: File, buf_size: usize, mut buf: BytesMut) -> io::Result<(File,
     Ok((file, buf))
 }
 
-fn open_and_read(path: &Path, buf_size: Option<usize>) -> io::Result<(File, BytesMut)> {
-    let initial_cap = match fs::metadata(path) {
+fn finalize_buf_size(buf_size: Option<usize>, file: &File) -> usize {
+    match file.metadata() {
         Ok(metadata) => {
             // try to get the buffer size from the OS if necessary
             let buf_size = buf_size.unwrap_or_else(|| get_block_size(&metadata));
@@ -154,10 +169,13 @@ fn open_and_read(path: &Path, buf_size: Option<usize>) -> io::Result<(File, Byte
             cmp::min(metadata.len() as usize, buf_size)
         }
         _ => buf_size.unwrap_or(BUF_SIZE),
-    };
+    }
+}
 
+fn open_and_read(path: &Path, buf_size: Option<usize>) -> io::Result<(File, BytesMut)> {
     let file = File::open(path)?;
-    read(file, initial_cap, BytesMut::with_capacity(initial_cap))
+    let final_buf_size = finalize_buf_size(buf_size, &file);
+    read(file, final_buf_size, BytesMut::with_capacity(final_buf_size))
 }
 
 #[cfg(unix)]
@@ -167,6 +185,6 @@ fn get_block_size(metadata: &Metadata) -> usize {
 }
 
 #[cfg(not(unix))]
-fn get_block_size(metadata: &Metadata) -> usize {
+fn get_block_size(_metadata: &Metadata) -> usize {
     BUF_SIZE
 }

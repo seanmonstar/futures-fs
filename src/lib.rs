@@ -71,6 +71,15 @@ impl FsPool {
         ::read::new(self, path, opts)
     }
 
+    /// Returns a `Stream` of the contents of the supplied file.
+    pub fn read_file(
+        &self,
+        file: fs::File,
+        opts: ReadOptions,
+    ) -> FsReadStream {
+        ::read::new_from_file(self, file, opts)
+    }
+
     /// Returns a `Sink` to send bytes to be written to the file at the supplied path.
     pub fn write<P: AsRef<Path> + Send + 'static>(
         &self,
@@ -78,6 +87,14 @@ impl FsPool {
         opts: WriteOptions,
     ) -> FsWriteSink {
         ::write::new(self, path, opts)
+    }
+
+    /// Returns a `Sink` to send bytes to be written to the supplied file.
+    pub fn write_file(
+        &self,
+        file: fs::File,
+    ) -> FsWriteSink {
+        ::write::new_from_file(self, file)
     }
 
     /// Returns a `Future` that resolves when the target file is deleted.
