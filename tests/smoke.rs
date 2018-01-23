@@ -64,7 +64,7 @@ fn test_from_file_smoke() {
     let fs = FsPool::default();
 
     let mut tmp = env::temp_dir();
-    tmp.push("futures-fs");
+    tmp.push("futures-fs-file");
 
     let bytes = futures::stream::iter_ok::<_, io::Error>(
         vec!["hello", " ", "world"]
@@ -96,7 +96,7 @@ fn test_from_file_smoke_long() {
     let fs = FsPool::default();
 
     let mut tmp = env::temp_dir();
-    tmp.push("futures-fs-long");
+    tmp.push("futures-fs-file-long");
 
     let file = fs::File::create(&tmp).unwrap();
 
