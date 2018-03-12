@@ -57,8 +57,13 @@ pub struct FsPool {
 impl FsPool {
     /// Creates a new `FsPool`, with the supplied number of threads.
     pub fn new(threads: usize) -> FsPool {
+        FsPool::from_cpu_pool(CpuPool::new(threads))
+    }
+
+    /// Creates a new `FsPool`, from an existing `CpuPool`.
+    pub fn from_cpu_pool(cpu_pool: CpuPool) -> FsPool {
         FsPool {
-            cpu_pool: CpuPool::new(threads),
+            cpu_pool,
         }
     }
 
