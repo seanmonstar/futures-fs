@@ -6,9 +6,11 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::{Async, Future, Poll, Stream};
-use futures_cpupool::CpuFuture;
+use futures::future::lazy;
+use futures::sync::oneshot;
 
 use FsPool;
+use FsFuture;
 
 const BUF_SIZE: usize = 8192;
 
@@ -29,11 +31,10 @@ impl Default for ReadOptions {
     }
 }
 
-pub fn new<P: AsRef<Path> + Send + 'static>(
-    pool: &FsPool,
-    path: P,
-    opts: ReadOptions,
-) -> FsReadStream {
+pub fn new<P>(pool: &FsPool, path: P, opts: ReadOptions) -> FsReadStream
+where
+    P: AsRef<Path> + Send + 'static,
+{
     FsReadStream {
         buffer: BytesMut::with_capacity(0),
         //TODO: can we adjust bounds, since this is making an owned copy anyways?
@@ -43,11 +44,7 @@ pub fn new<P: AsRef<Path> + Send + 'static>(
     }
 }
 
-pub fn new_from_file(
-    pool: &FsPool,
-    file: File,
-    opts: ReadOptions,
-) -> FsReadStream {
+pub fn new_from_file(pool: &FsPool, file: File, opts: ReadOptions) -> FsReadStream {
     let final_buf_size = finalize_buf_size(opts.buffer_size, &file);
     FsReadStream {
         buffer: BytesMut::with_capacity(0),
@@ -68,8 +65,8 @@ pub struct FsReadStream {
 
 enum State {
     Init(Option<usize>),
-    Opening(CpuFuture<(File, BytesMut), io::Error>),
-    Working(CpuFuture<(File, BytesMut), io::Error>, usize),
+    Opening(FsFuture<(File, BytesMut)>),
+    Working(FsFuture<(File, BytesMut)>, usize),
     Ready(File, usize),
     Eof,
     Swapping,
@@ -102,35 +99,48 @@ impl Stream for FsReadStream {
             match mem::replace(&mut self.state, State::Swapping) {
                 State::Init(buf_size) => {
                     let path = self.path.clone();
-                    self.state = State::Opening(
-                        self.pool
-                            .cpu_pool
-                            .spawn_fn(move || open_and_read(&path, buf_size)),
-                    );
+
+                    let (tx, rx) = oneshot::channel();
+
+                    let fut = Box::new(lazy(move || {
+                        let res = open_and_read(&path, buf_size).map_err(From::from);
+
+                        tx.send(res).map_err(|_| ())
+                    }));
+
+                    self.pool.executor.execute(fut).unwrap();
+
+                    self.state = State::Opening(super::fs(rx));
                 }
-                State::Opening(mut cpu) => {
-                    let polled = cpu.poll();
-                    self.state = State::Opening(cpu);
+                State::Opening(mut rx) => {
+                    let polled = rx.poll();
+                    self.state = State::Opening(rx);
                     let (file, chunk) = try_ready!(polled);
                     let buf_size = chunk.capacity();
 
                     return self.handle_read(file, chunk, buf_size);
                 }
-                State::Working(mut cpu, buf_size) => {
-                    let polled = cpu.poll();
-                    self.state = State::Working(cpu, buf_size);
+                State::Working(mut rx, buf_size) => {
+                    let polled = rx.poll();
+                    self.state = State::Working(rx, buf_size);
                     let (file, chunk) = try_ready!(polled);
 
                     return self.handle_read(file, chunk, buf_size);
                 }
                 State::Ready(file, buf_size) => {
                     let buf = self.buffer.split_off(0);
-                    self.state = State::Working(
-                        self.pool
-                            .cpu_pool
-                            .spawn_fn(move || read(file, buf_size, buf)),
-                        buf_size,
-                    );
+
+                    let (tx, rx) = oneshot::channel();
+
+                    let fut = Box::new(lazy(move || {
+                        let res = read(file, buf_size, buf).map_err(From::from);
+
+                        tx.send(res).map_err(|_| ())
+                    }));
+
+                    self.pool.executor.execute(fut).unwrap();
+
+                    self.state = State::Working(super::fs(rx), buf_size);
                 }
                 State::Eof => {
                     self.state = State::Eof;
@@ -175,7 +185,11 @@ fn finalize_buf_size(buf_size: Option<usize>, file: &File) -> usize {
 fn open_and_read(path: &Path, buf_size: Option<usize>) -> io::Result<(File, BytesMut)> {
     let file = File::open(path)?;
     let final_buf_size = finalize_buf_size(buf_size, &file);
-    read(file, final_buf_size, BytesMut::with_capacity(final_buf_size))
+    read(
+        file,
+        final_buf_size,
+        BytesMut::with_capacity(final_buf_size),
+    )
 }
 
 #[cfg(unix)]

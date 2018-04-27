@@ -5,26 +5,33 @@ use std::path::Path;
 
 use bytes::Bytes;
 use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
-use futures_cpupool::CpuFuture;
+use futures::future::lazy;
+use futures::sync::oneshot;
 
 use FsPool;
+use FsFuture;
 
-pub fn new<P: AsRef<Path> + Send + 'static>(
-    pool: &FsPool,
-    path: P,
-    opts: WriteOptions,
-) -> FsWriteSink {
-    let open = pool.cpu_pool.spawn_fn(move || opts.open.open(path));
+pub fn new<P>(pool: &FsPool, path: P, opts: WriteOptions) -> FsWriteSink
+where
+    P: AsRef<Path> + Send + 'static,
+{
+    let (tx, rx) = oneshot::channel();
+
+    let fut = Box::new(lazy(move || {
+        let res = opts.open.open(path).map_err(From::from);
+
+        tx.send(res).map_err(|_| ())
+    }));
+
+    pool.executor.execute(fut).unwrap();
+
     FsWriteSink {
         pool: pool.clone(),
-        state: State::Working(open),
+        state: State::Working(super::fs(rx)),
     }
 }
 
-pub fn new_from_file(
-    pool: &FsPool,
-    file: File,
-) -> FsWriteSink {
+pub fn new_from_file(pool: &FsPool, file: File) -> FsWriteSink {
     FsWriteSink {
         pool: pool.clone(),
         state: State::Ready(file),
@@ -62,7 +69,7 @@ impl From<OpenOptions> for WriteOptions {
 }
 
 enum State {
-    Working(CpuFuture<File, io::Error>),
+    Working(FsFuture<File>),
     Ready(File),
     Swapping,
 }
@@ -70,8 +77,8 @@ enum State {
 impl FsWriteSink {
     fn poll_working(&mut self) -> Poll<(), io::Error> {
         let state = match self.state {
-            State::Working(ref mut cpu) => {
-                let file = try_ready!(cpu.poll());
+            State::Working(ref mut rx) => {
+                let file = try_ready!(rx.poll());
                 State::Ready(file)
             }
             State::Ready(_) => {
@@ -95,10 +102,20 @@ impl Sink for FsWriteSink {
                 State::Ready(file) => file,
                 _ => unreachable!(),
             };
-            self.state = State::Working(self.pool.cpu_pool.spawn_fn(move || {
-                file.write_all(item.as_ref())?;
-                Ok(file)
+
+            let (tx, rx) = oneshot::channel();
+
+            let fut = Box::new(lazy(move || {
+                let res = file.write_all(item.as_ref())
+                    .map(|_| file)
+                    .map_err(From::from);
+
+                tx.send(res).map_err(|_| ())
             }));
+
+            self.pool.executor.execute(fut).unwrap();
+
+            self.state = State::Working(super::fs(rx));
             Ok(AsyncSink::Ready)
         } else {
             Ok(AsyncSink::NotReady(item))

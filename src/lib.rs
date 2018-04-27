@@ -38,9 +38,12 @@ extern crate futures_cpupool;
 
 use std::{fmt, fs, io};
 use std::path::Path;
+use std::sync::Arc;
 
-use futures::{Future, Poll};
-use futures_cpupool::{CpuFuture, CpuPool};
+use futures::{Async, Future, Poll};
+use futures::future::{lazy, Executor};
+use futures::sync::oneshot::{self, Receiver};
+use futures_cpupool::CpuPool;
 
 pub use self::read::{FsReadStream, ReadOptions};
 pub use self::write::{FsWriteSink, WriteOptions};
@@ -51,14 +54,24 @@ mod write;
 /// A pool of threads to handle file IO.
 #[derive(Clone)]
 pub struct FsPool {
-    cpu_pool: CpuPool,
+    executor: Arc<Executor<Box<Future<Item = (), Error = ()> + Send>>>,
 }
 
 impl FsPool {
     /// Creates a new `FsPool`, with the supplied number of threads.
-    pub fn new(threads: usize) -> FsPool {
+    pub fn new(threads: usize) -> Self {
         FsPool {
-            cpu_pool: CpuPool::new(threads),
+            executor: Arc::new(CpuPool::new(threads)),
+        }
+    }
+
+    /// Creates a new `FsPool`, from an existing `Executor`.
+    pub fn from_executor<E>(executor: E) -> Self
+    where
+        E: Executor<Box<Future<Item = (), Error = ()> + Send>> + Clone + 'static,
+    {
+        FsPool {
+            executor: Arc::new(executor),
         }
     }
 
@@ -72,11 +85,7 @@ impl FsPool {
     }
 
     /// Returns a `Stream` of the contents of the supplied file.
-    pub fn read_file(
-        &self,
-        file: fs::File,
-        opts: ReadOptions,
-    ) -> FsReadStream {
+    pub fn read_file(&self, file: fs::File, opts: ReadOptions) -> FsReadStream {
         ::read::new_from_file(self, file, opts)
     }
 
@@ -90,16 +99,22 @@ impl FsPool {
     }
 
     /// Returns a `Sink` to send bytes to be written to the supplied file.
-    pub fn write_file(
-        &self,
-        file: fs::File,
-    ) -> FsWriteSink {
+    pub fn write_file(&self, file: fs::File) -> FsWriteSink {
         ::write::new_from_file(self, file)
     }
 
     /// Returns a `Future` that resolves when the target file is deleted.
     pub fn delete<P: AsRef<Path> + Send + 'static>(&self, path: P) -> FsFuture<()> {
-        fs(self.cpu_pool.spawn_fn(move || fs::remove_file(path)))
+        let (tx, rx) = oneshot::channel();
+
+        let fut = Box::new(lazy(move || {
+            tx.send(fs::remove_file(path).map_err(From::from))
+                .map_err(|_| ())
+        }));
+
+        self.executor.execute(fut).unwrap();
+
+        fs(rx)
     }
 }
 
@@ -117,11 +132,11 @@ impl fmt::Debug for FsPool {
 
 /// A future representing work in the `FsPool`.
 pub struct FsFuture<T> {
-    inner: CpuFuture<T, io::Error>,
+    inner: Receiver<io::Result<T>>,
 }
 
-fn fs<T: Send>(cpu: CpuFuture<T, io::Error>) -> FsFuture<T> {
-    FsFuture { inner: cpu }
+fn fs<T: Send>(rx: Receiver<io::Result<T>>) -> FsFuture<T> {
+    FsFuture { inner: rx }
 }
 
 impl<T: Send + 'static> Future for FsFuture<T> {
@@ -129,7 +144,11 @@ impl<T: Send + 'static> Future for FsFuture<T> {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.inner.poll()
+        match self.inner.poll().unwrap() {
+            Async::Ready(Ok(item)) => Ok(Async::Ready(item)),
+            Async::Ready(Err(e)) => Err(e),
+            Async::NotReady => Ok(Async::NotReady),
+        }
     }
 }
 

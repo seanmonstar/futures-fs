@@ -1,10 +1,9 @@
 extern crate futures;
 extern crate futures_fs;
 
-use std::{env, io, fs};
+use std::{env, fs, io};
 use futures::{Future, Sink, Stream};
 use futures_fs::FsPool;
-
 
 #[test]
 fn test_smoke() {
@@ -33,7 +32,6 @@ fn test_smoke() {
     fs.delete(tmp).wait().unwrap();
 }
 
-
 #[test]
 fn test_smoke_long() {
     let fs = FsPool::default();
@@ -58,7 +56,6 @@ fn test_smoke_long() {
     fs.delete(tmp).wait().unwrap();
 }
 
-
 #[test]
 fn test_from_file_smoke() {
     let fs = FsPool::default();
@@ -74,10 +71,7 @@ fn test_from_file_smoke() {
 
     let file = fs::File::create(&tmp).unwrap();
 
-    bytes
-        .forward(fs.write_file(file))
-        .wait()
-        .unwrap();
+    bytes.forward(fs.write_file(file)).wait().unwrap();
 
     let file = fs::File::open(&tmp).unwrap();
 
@@ -89,7 +83,6 @@ fn test_from_file_smoke() {
     assert_eq!(data, b"hello world");
     fs.delete(tmp).wait().unwrap();
 }
-
 
 #[test]
 fn test_from_file_smoke_long() {
