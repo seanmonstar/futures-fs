@@ -66,6 +66,16 @@ impl FsPool {
     }
 
     /// Creates a new `FsPool`, from an existing `Executor`.
+    ///
+    /// # Note
+    ///
+    /// The executor will be used to spawn tasks that can block the thread.
+    /// It likely should not be an executor that is also handling light-weight
+    /// tasks, but a dedicated thread pool.
+    ///
+    /// The most common use of this constructor is to allow creating a single
+    /// `CpuPool` for your application for blocking tasks, and sharing it with
+    /// `FsPool` and any other things needing a thread pool.
     pub fn from_executor<E>(executor: E) -> Self
     where
         E: Executor<Box<Future<Item = (), Error = ()> + Send>> + Clone + 'static,
