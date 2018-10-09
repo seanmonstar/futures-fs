@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 #![cfg_attr(test, deny(warnings))]
 #![deny(missing_debug_implementations)]
-#![doc(html_root_url = "https://docs.rs/futures-fs/0.0.4")]
+#![doc(html_root_url = "https://docs.rs/futures-fs/0.0.5")]
 
 //! A thread pool to handle file IO operations.
 //!
