@@ -17,7 +17,7 @@ const BUF_SIZE: usize = 8192;
 /// Options for how to read the file.
 ///
 /// The default is to automatically determine the buffer size.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ReadOptions {
     /// The buffer size to use.
     ///
@@ -25,13 +25,22 @@ pub struct ReadOptions {
     buffer_size: Option<usize>,
 }
 
-impl Default for ReadOptions {
-    fn default() -> ReadOptions {
-        ReadOptions { buffer_size: None }
+impl ReadOptions {
+    /// The buffer size to use when reading.
+    ///
+    /// Default is automatically determined from the operating system.
+    ///
+    /// # Panic
+    ///
+    /// The passed argument must be larger than 0.
+    pub fn buffer_size(mut self, buffer_size: usize) -> Self {
+        assert!(buffer_size > 0, "buffer size must be larger than 0");
+        self.buffer_size = Some(buffer_size);
+        self
     }
 }
 
-pub fn new<P>(pool: &FsPool, path: P, opts: ReadOptions) -> FsReadStream
+pub(crate) fn new<P>(pool: &FsPool, path: P, opts: ReadOptions) -> FsReadStream
 where
     P: AsRef<Path> + Send + 'static,
 {
@@ -44,7 +53,7 @@ where
     }
 }
 
-pub fn new_from_file(pool: &FsPool, file: File, opts: ReadOptions) -> FsReadStream {
+pub(crate) fn new_from_file(pool: &FsPool, file: File, opts: ReadOptions) -> FsReadStream {
     let final_buf_size = finalize_buf_size(opts.buffer_size, &file);
     FsReadStream {
         buffer: BytesMut::with_capacity(0),

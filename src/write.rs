@@ -11,7 +11,7 @@ use futures::sync::oneshot;
 use FsPool;
 use FsFuture;
 
-pub fn new<P>(pool: &FsPool, path: P, opts: WriteOptions) -> FsWriteSink
+pub(crate) fn new<P>(pool: &FsPool, path: P, opts: WriteOptions) -> FsWriteSink
 where
     P: AsRef<Path> + Send + 'static,
 {
@@ -31,7 +31,7 @@ where
     }
 }
 
-pub fn new_from_file(pool: &FsPool, file: File) -> FsWriteSink {
+pub(crate) fn new_from_file(pool: &FsPool, file: File) -> FsWriteSink {
     FsWriteSink {
         pool: pool.clone(),
         state: State::Ready(file),
