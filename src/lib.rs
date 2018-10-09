@@ -54,8 +54,10 @@ mod write;
 /// A pool of threads to handle file IO.
 #[derive(Clone)]
 pub struct FsPool {
-    executor: Arc<Executor<Box<Future<Item = (), Error = ()> + Send>>>,
+    executor: Arc<Executor<Box<Future<Item = (), Error = ()> + Send>> + Send + Sync>,
 }
+
+// ===== impl FsPool ======
 
 impl FsPool {
     /// Creates a new `FsPool`, with the supplied number of threads.
@@ -78,7 +80,7 @@ impl FsPool {
     /// `FsPool` and any other things needing a thread pool.
     pub fn from_executor<E>(executor: E) -> Self
     where
-        E: Executor<Box<Future<Item = (), Error = ()> + Send>> + Clone + 'static,
+        E: Executor<Box<Future<Item = (), Error = ()> + Send>> + Send + Sync + 'static,
     {
         FsPool {
             executor: Arc::new(executor),
@@ -139,6 +141,18 @@ impl fmt::Debug for FsPool {
         f.debug_struct("FsPool").finish()
     }
 }
+
+fn _assert_kinds() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+    fn assert_clone<T: Clone>() {}
+
+    assert_send::<FsPool>();
+    assert_sync::<FsPool>();
+    assert_clone::<FsPool>();
+}
+
+// ===== impl FsFuture =====
 
 /// A future representing work in the `FsPool`.
 pub struct FsFuture<T> {
