@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-#![deny(warnings)]
+#![cfg_attr(test, deny(warnings))]
 #![deny(missing_debug_implementations)]
 #![doc(html_root_url = "https://docs.rs/futures-fs/0.0.4")]
 
@@ -99,11 +99,10 @@ impl FsPool {
     }
 
     /// Returns a `Stream` of the contents of the file at the supplied path.
-    pub fn read<P: AsRef<Path> + Send + 'static>(
-        &self,
-        path: P,
-        opts: ReadOptions,
-    ) -> FsReadStream {
+    pub fn read<P>(&self, path: P, opts: ReadOptions) -> FsReadStream
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
         ::read::new(self, path, opts)
     }
 
@@ -113,11 +112,10 @@ impl FsPool {
     }
 
     /// Returns a `Sink` to send bytes to be written to the file at the supplied path.
-    pub fn write<P: AsRef<Path> + Send + 'static>(
-        &self,
-        path: P,
-        opts: WriteOptions,
-    ) -> FsWriteSink {
+    pub fn write<P>(&self, path: P, opts: WriteOptions) -> FsWriteSink
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
         ::write::new(self, path, opts)
     }
 
@@ -127,7 +125,10 @@ impl FsPool {
     }
 
     /// Returns a `Future` that resolves when the target file is deleted.
-    pub fn delete<P: AsRef<Path> + Send + 'static>(&self, path: P) -> FsFuture<()> {
+    pub fn delete<P>(&self, path: P) -> FsFuture<()>
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
         let (tx, rx) = oneshot::channel();
 
         let fut = Box::new(lazy(move || {
@@ -153,15 +154,6 @@ impl fmt::Debug for FsPool {
     }
 }
 
-fn _assert_kinds() {
-    fn assert_send<T: Send>() {}
-    fn assert_sync<T: Sync>() {}
-    fn assert_clone<T: Clone>() {}
-
-    assert_send::<FsPool>();
-    assert_sync::<FsPool>();
-    assert_clone::<FsPool>();
-}
 
 // ===== impl FsFuture =====
 
@@ -191,4 +183,16 @@ impl<T> fmt::Debug for FsFuture<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("FsFuture").finish()
     }
+}
+
+fn _assert_kinds() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+    fn assert_clone<T: Clone>() {}
+
+    assert_send::<FsPool>();
+    assert_sync::<FsPool>();
+    assert_clone::<FsPool>();
+
+    assert_send::<FsFuture<()>>();
 }
