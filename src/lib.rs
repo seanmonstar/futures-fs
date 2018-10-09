@@ -78,6 +78,17 @@ impl FsPool {
     /// The most common use of this constructor is to allow creating a single
     /// `CpuPool` for your application for blocking tasks, and sharing it with
     /// `FsPool` and any other things needing a thread pool.
+    pub fn with_executor<E>(executor: E) -> Self
+    where
+        E: Executor<Box<Future<Item = (), Error = ()> + Send>> + Send + Sync + 'static,
+    {
+        FsPool {
+            executor: Arc::new(executor),
+        }
+    }
+
+    #[doc(hidden)]
+    #[deprecated(note = "renamed to with_executor")]
     pub fn from_executor<E>(executor: E) -> Self
     where
         E: Executor<Box<Future<Item = (), Error = ()> + Send>> + Send + Sync + 'static,
