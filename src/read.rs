@@ -56,7 +56,7 @@ where
 pub(crate) fn new_from_file(pool: &FsPool, file: File, opts: ReadOptions) -> FsReadStream {
     let final_buf_size = finalize_buf_size(opts.buffer_size, &file);
     FsReadStream {
-        buffer: BytesMut::with_capacity(0),
+        buffer: BytesMut::with_capacity(final_buf_size),
         //TODO: can we adjust bounds, since this is making an owned copy anyways?
         path: Arc::new(PathBuf::new()),
         pool: pool.clone(),
